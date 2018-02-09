@@ -61,7 +61,9 @@ export default class DataTable {
       this.debug("redisSub.onmessage => ch=%s str=%s", ch, str);
       if (ch === this.channelKey) {
         const key = str;
-        this.debug("sync: key=%s", key);
+        this.get(key).then(value => {
+          this.debug("sync: %s=%s", key, value);
+        });
       }
     });
     this.redisSub.subscribe(this.channelKey, () => {
@@ -223,7 +225,7 @@ export default class DataTable {
       .incrby(this.joinDataPrefix(key), increment)
       .then((value: any) => {
         value = Number(value);
-        this.set(key, value);
+        this.syncData.set(key, value);
         return this.publishSyncDataEvent(key, value);
       }) as any;
   }
@@ -234,12 +236,6 @@ export default class DataTable {
    * @param increment
    */
   public decr(key: string, increment: number = 1): Promise<any> {
-    return this.redisPub
-      .incrby(this.joinDataPrefix(key), -increment)
-      .then((value: any) => {
-        value = Number(value);
-        this.set(key, value);
-        return this.publishSyncDataEvent(key, value);
-      }) as any;
+    return this.incr(key, -increment);
   }
 }
