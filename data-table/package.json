@@ -2,10 +2,13 @@
   "name": "@leizm/distributed-data-table",
   "version": "1.0.0",
   "description": "分布式共享数据表",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
+  "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
+  "files": [
+    "dist/index.d.ts",
+    "dist/index.js",
+    "dist/index.js.map"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/leizongmin/nodejs-distributed-modules.git"
@@ -23,8 +26,18 @@
     "ioredis": "^3.2.2"
   },
   "devDependencies": {
+    "@types/chai": "^4.1.2",
+    "@types/mocha": "^2.2.48",
+    "chai": "^4.1.2",
+    "mocha": "^5.0.0",
     "prettier": "^1.10.2",
+    "ts-node": "^4.1.0",
     "typescript": "^2.7.1"
+  },
+  "scripts": {
+    "compile": "rm -rf dist && tsc",
+    "test": "export DEBUG='@leizm:*' && mocha --exit --require ts-node/register src/test.ts",
+    "prepublish": "npm run compile && npm test"
   },
   "author": "Zongmin Lei <leizongmin@gmail.com>",
   "license": "MIT",
