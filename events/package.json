@@ -1,0 +1,40 @@
+{
+  "name": "@leizm/distributed-events",
+  "version": "1.0.0",
+  "description": "分布式事件监听触发模块",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/leizongmin/nodejs-distributed-modules.git"
+  },
+  "keywords": [
+    "distributed",
+    "data",
+    "shared"
+  ],
+  "dependencies": {
+    "@types/debug": "0.0.30",
+    "@types/ioredis": "^3.2.5",
+    "@types/node": "^9.4.2",
+    "debug": "^3.1.0",
+    "ioredis": "^3.2.2"
+  },
+  "devDependencies": {
+    "@types/chai": "^4.1.2",
+    "@types/mocha": "^2.2.48",
+    "chai": "^4.1.2",
+    "mocha": "^5.0.0",
+    "prettier": "^1.10.2",
+    "ts-node": "^4.1.0",
+    "typescript": "^2.7.1"
+  },
+  "scripts": {
+    "test": "export DEBUG='@leizm:*' && mocha --exit --require ts-node/register src/test.ts"
+  },
+  "author": "Zongmin Lei <leizongmin@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/leizongmin/nodejs-distributed-modules/issues"
+  },
+  "homepage": "https://github.com/leizongmin/nodejs-distributed-modules#readme"
+}

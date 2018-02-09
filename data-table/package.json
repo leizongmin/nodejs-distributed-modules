@@ -1,0 +1,35 @@
+{
+  "name": "@leizm/distributed-data-table",
+  "version": "1.0.0",
+  "description": "分布式共享数据表",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/leizongmin/nodejs-distributed-modules.git"
+  },
+  "keywords": [
+    "distributed",
+    "data",
+    "shared"
+  ],
+  "dependencies": {
+    "@types/debug": "0.0.30",
+    "@types/ioredis": "^3.2.5",
+    "@types/node": "^9.4.2",
+    "debug": "^3.1.0",
+    "ioredis": "^3.2.2"
+  },
+  "devDependencies": {
+    "prettier": "^1.10.2",
+    "typescript": "^2.7.1"
+  },
+  "author": "Zongmin Lei <leizongmin@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/leizongmin/nodejs-distributed-modules/issues"
+  },
+  "homepage": "https://github.com/leizongmin/nodejs-distributed-modules#readme"
+}
