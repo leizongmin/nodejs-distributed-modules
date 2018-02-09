@@ -42,7 +42,7 @@ export default class EventEmitter {
 
     this.channelKey = options.channelKey || "events";
     if (options.keyPrefix) {
-      this.channelKey = this.channelKey + this.channelKey;
+      this.channelKey = options.keyPrefix + this.channelKey;
     }
 
     this.redisSub = new Redis(options.redis);
