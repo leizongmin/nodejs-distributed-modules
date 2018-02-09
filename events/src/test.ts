@@ -64,7 +64,7 @@ describe("test @leizm/distributed-events", function() {
     e.on("call", (i: number, t: number) => {
       ts[i] = process.uptime() - t;
       if (i === max - 1) {
-        ts.forEach(v => expect(v).to.lessThan(0.005));
+        ts.forEach(v => expect(v).to.lessThan(0.01));
 
         e.destroy();
         done();
@@ -78,8 +78,7 @@ describe("test @leizm/distributed-events", function() {
     e.ready().then(async () => {
       for (let i = 0; i < max; i++) {
         await sleep(1);
-        const t = process.uptime();
-        e.emit("call", i, t);
+        e.emit("call", i, process.uptime());
       }
     });
   });
