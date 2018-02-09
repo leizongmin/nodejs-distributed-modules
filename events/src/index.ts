@@ -79,8 +79,8 @@ export default class EventEmitter {
     if (options.redis && options.redis.db) {
       this.redisPub.select(options.redis.db);
     }
-    this.redisSub.on("error", err => {
-      this.debug("redisSub.on(error) => %s", err);
+    this.redisPub.on("error", err => {
+      this.debug("redisPub.on(error) => %s", err);
       this.event.emit("error", err);
     });
   }

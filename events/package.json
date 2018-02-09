@@ -1,6 +1,6 @@
 {
   "name": "@leizm/distributed-events",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "分布式事件监听触发模块",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
