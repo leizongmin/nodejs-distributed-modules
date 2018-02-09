@@ -40,8 +40,31 @@ describe("test @leizm/distributed-data-table", function() {
         expect(b).to.equal(456);
       }
 
-      expect(dt.getSync('a')).to.equal(123);
-      expect(dt.getSync('b')).to.equal(456);
+      expect(dt.getSync("a")).to.equal(123);
+      expect(dt.getSync("b")).to.equal(456);
+
+      dt.destroy();
+      done();
+    });
+  });
+
+  it("cocurrent set()", function(done) {
+    const dt = new DataTable({
+      redis: { db: 1 }
+    });
+    dt.ready().then(async () => {
+      await Promise.all([
+        dt.set("a", 123),
+        dt.set("a", 456),
+        dt.set("a", 234),
+        dt.set("a", 567),
+        dt.set("a", 678),
+        dt.set("a", 789)
+      ]);
+
+      expect(dt.getSync("a")).to.equal(789);
+      const a = await dt.get("a");
+      expect(a).to.equal(789);
 
       dt.destroy();
       done();
