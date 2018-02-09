@@ -22,6 +22,9 @@ export const COUNTER_SYMBOL = Symbol("counter");
 export default class EventEmitter {
   protected static [COUNTER_SYMBOL]: number = 0;
 
+  protected readonly id: string = `${Date.now()}.${
+    process.pid
+  }.${Math.random()}`;
   protected readonly debug: debug.IDebugger;
   protected readonly event: events.EventEmitter = new events.EventEmitter();
   protected readonly channelKey: string;
@@ -64,7 +67,9 @@ export default class EventEmitter {
         this.event.emit(data.e, ...data.a);
       }
     });
-    this.redisSub.subscribe(this.channelKey);
+    this.redisSub.subscribe(this.channelKey, () => {
+
+    });
 
     this.redisPub = new Redis(options.redis);
     if (options.redis && options.redis.db) {
@@ -109,5 +114,13 @@ export default class EventEmitter {
       JSON.stringify({ e: event, a: args })
     );
     return this;
+  }
+
+  /**
+   * 销毁
+   */
+  public destroy() {
+    this.redisPub.disconnect();
+    this.redisSub.disconnect();
   }
 }
