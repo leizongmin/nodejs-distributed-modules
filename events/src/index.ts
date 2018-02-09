@@ -18,6 +18,7 @@ export interface Options {
 }
 
 export const COUNTER_SYMBOL = Symbol("counter");
+export const READY_EVENT_SYMBOL = Symbol("ready event");
 
 export default class EventEmitter {
   protected static [COUNTER_SYMBOL]: number = 0;
@@ -30,6 +31,7 @@ export default class EventEmitter {
   protected readonly channelKey: string;
   protected readonly redisSub: Redis.Redis;
   protected readonly redisPub: Redis.Redis;
+  protected isReady: boolean = false;
 
   constructor(options?: Options) {
     options = options || {};
@@ -68,7 +70,9 @@ export default class EventEmitter {
       }
     });
     this.redisSub.subscribe(this.channelKey, () => {
-
+      this.debug("redisSub.subscribe.ready");
+      this.isReady = true;
+      this.event.emit(READY_EVENT_SYMBOL);
     });
 
     this.redisPub = new Redis(options.redis);
@@ -114,6 +118,16 @@ export default class EventEmitter {
       JSON.stringify({ e: event, a: args })
     );
     return this;
+  }
+
+  /**
+   * 等待就绪
+   */
+  public ready(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (this.isReady) return resolve();
+      this.event.once(READY_EVENT_SYMBOL, resolve);
+    });
   }
 
   /**
