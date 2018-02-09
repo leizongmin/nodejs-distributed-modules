@@ -34,6 +34,7 @@ export default class DataTable {
   protected readonly redisPub: Redis.Redis;
   protected readonly syncData: Map<string, any> = new Map();
   protected isReady: boolean = false;
+  protected isInitSync: boolean = false;
 
   constructor(options?: Options) {
     options = options || {};
@@ -102,6 +103,8 @@ export default class DataTable {
           }
           this.syncData.set(k, v);
         });
+        this.isInitSync = true;
+        this.debug("syncData.init.ready");
       });
   }
 
@@ -132,7 +135,7 @@ export default class DataTable {
    */
   public ready(): Promise<void> {
     return new Promise((resolve, reject) => {
-      if (this.isReady) return resolve();
+      if (this.isReady && this.isInitSync) return resolve();
       this.event.once(READY_EVENT_SYMBOL, resolve);
     });
   }
