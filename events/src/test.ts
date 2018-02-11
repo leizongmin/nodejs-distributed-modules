@@ -16,9 +16,12 @@ describe("test @leizm/distributed-events", function() {
       e.destroy();
       done();
     });
-    e.ready().then(() => {
-      e.emit("hello", 4, 5, 9);
-    });
+    e
+      .ready()
+      .then(() => {
+        e.emit("hello", 4, 5, 9);
+      })
+      .catch(done);
   });
 
   it("once", function(done) {
@@ -34,9 +37,12 @@ describe("test @leizm/distributed-events", function() {
       });
       e.emit("hello", 3, 3);
     });
-    e.ready().then(() => {
-      e.emit("hello", 4, 5, 9);
-    });
+    e
+      .ready()
+      .then(() => {
+        e.emit("hello", 4, 5, 9);
+      })
+      .catch(done);
   });
 
   it("multi clients & multi methods", function(done) {
@@ -54,7 +60,8 @@ describe("test @leizm/distributed-events", function() {
       .then(() => e2.ready())
       .then(() => {
         e2.emit("hello", "world");
-      });
+      })
+      .catch(done);
   });
 
   it("delay", function(done) {
@@ -75,11 +82,14 @@ describe("test @leizm/distributed-events", function() {
         setTimeout(resolve, ms);
       });
     };
-    e.ready().then(async () => {
-      for (let i = 0; i < max; i++) {
-        await sleep(1);
-        e.emit("call", i, process.uptime());
-      }
-    });
+    e
+      .ready()
+      .then(async () => {
+        for (let i = 0; i < max; i++) {
+          await sleep(1);
+          e.emit("call", i, process.uptime());
+        }
+      })
+      .catch(done);
   });
 });

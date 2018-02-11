@@ -1,5 +1,5 @@
 /**
- * @leizm/distributed-data-table
+ * @leizm/distributed-shared-data
  *
  * @author Zongmin Lei <leizongmin@gmail.com>
  */
@@ -20,7 +20,7 @@ export interface Options {
 export const COUNTER_SYMBOL = Symbol("counter");
 export const READY_EVENT_SYMBOL = Symbol("ready event");
 
-export default class DataTable {
+export default class SharedData {
   protected static [COUNTER_SYMBOL]: number = 0;
 
   protected readonly id: string = `${Date.now()}.${
@@ -38,9 +38,9 @@ export default class DataTable {
 
   constructor(options?: Options) {
     options = options || {};
-    DataTable[COUNTER_SYMBOL]++;
+    SharedData[COUNTER_SYMBOL]++;
     this.debug = createDebug(
-      `@leizm:distributed-data-table:#${DataTable[COUNTER_SYMBOL]}`
+      `@leizm:distributed-shared-data:#${SharedData[COUNTER_SYMBOL]}`
     );
 
     this.keyPrefix = options.keyPrefix || "d:";
@@ -60,16 +60,31 @@ export default class DataTable {
     this.redisSub.on("message", (ch, str) => {
       this.debug("redisSub.onmessage => ch=%s str=%s", ch, str);
       if (ch === this.channelKey) {
-        const key = str;
-        this.get(key).then(value => {
-          this.debug("sync: %s=%s", key, value);
+        let data: {
+          k: string;
+          i: string;
+        };
+        try {
+          data = JSON.parse(str);
+        } catch (err) {
+          this.debug("redisSub.onmessage error: %s", err);
+          this.event.emit("error", err);
+          return;
+        }
+        // 如果同步请求来自当前客户端（通过ID判断），则忽略此次更新
+        if (data.i === this.id) {
+          this.debug("ignore sync: %j", data);
+          return;
+        }
+        this.get(data.k).then(value => {
+          this.debug("sync: %s=%s", data.k, value);
         });
       }
     });
     this.redisSub.subscribe(this.channelKey, () => {
       this.debug("redisSub.subscribe.ready");
       this.isReady = true;
-      this.event.emit(READY_EVENT_SYMBOL);
+      this.checkReady();
     });
 
     this.redisPub = new Redis(options.redis);
@@ -92,7 +107,7 @@ export default class DataTable {
       })
       .then((values: string[]) => {
         values.forEach((v, i) => {
-          const k = this.stripDataPrefix(keys[i]);
+          const k = this.stripKeyPrefix(keys[i]);
           this.debug("init sync: %s=%s", k, v);
           try {
             v = JSON.parse(v);
@@ -107,7 +122,10 @@ export default class DataTable {
         });
         this.isInitSync = true;
         this.debug("syncData.init.ready");
+        this.checkReady();
       });
+
+    this.debug("create: %s", this.id);
   }
 
   /**
@@ -143,6 +161,15 @@ export default class DataTable {
   }
 
   /**
+   * 检查是否就绪
+   */
+  protected checkReady() {
+    if (this.isReady && this.isInitSync) {
+      this.event.emit(READY_EVENT_SYMBOL);
+    }
+  }
+
+  /**
    * 销毁
    */
   public destroy() {
@@ -154,7 +181,7 @@ export default class DataTable {
    * 添加键前缀
    * @param key
    */
-  protected joinDataPrefix(key: string): string {
+  public key(key: string): string {
     return this.keyPrefix + key;
   }
 
@@ -162,7 +189,7 @@ export default class DataTable {
    * 去除键前缀
    * @param key
    */
-  protected stripDataPrefix(key: string): string {
+  public stripKeyPrefix(key: string): string {
     return key.slice(this.keyPrefix.length);
   }
 
@@ -172,7 +199,10 @@ export default class DataTable {
    * @param value
    */
   protected publishSyncDataEvent(key: string, value: any): Promise<any> {
-    return this.redisPub.publish(this.channelKey, key) as any;
+    return this.redisPub.publish(
+      this.channelKey,
+      JSON.stringify({ k: key, i: this.id })
+    ) as any;
   }
 
   /**
@@ -186,10 +216,11 @@ export default class DataTable {
    * 存储数据
    */
   public set(key: string, value: any): Promise<any> {
+    this.debug("set %s=%s", key, value);
     const str = JSON.stringify(value);
     this.syncData.set(key, value);
     return this.redisPub
-      .set(this.joinDataPrefix(key), str)
+      .set(this.key(key), str)
       .then(() => this.publishSyncDataEvent(key, value))
       .then(() => value);
   }
@@ -201,7 +232,7 @@ export default class DataTable {
     if (this.syncData.has(key)) {
       return Promise.resolve(this.syncData.get(key));
     }
-    return this.redisPub.get(this.joinDataPrefix(key)).then(str => {
+    return this.redisPub.get(this.key(key)).then(str => {
       const data = JSON.parse(str);
       this.syncData.set(key, data);
       return data;
@@ -221,13 +252,12 @@ export default class DataTable {
    * @param increment
    */
   public incr(key: string, increment: number = 1): Promise<any> {
-    return this.redisPub
-      .incrby(this.joinDataPrefix(key), increment)
-      .then((value: any) => {
-        value = Number(value);
-        this.syncData.set(key, value);
-        return this.publishSyncDataEvent(key, value);
-      }) as any;
+    this.debug("incr %s", key);
+    return this.redisPub.incrby(this.key(key), increment).then((value: any) => {
+      value = Number(value);
+      this.syncData.set(key, value);
+      return this.publishSyncDataEvent(key, value);
+    }) as any;
   }
 
   /**
@@ -236,6 +266,7 @@ export default class DataTable {
    * @param increment
    */
   public decr(key: string, increment: number = 1): Promise<any> {
+    this.debug("decr %s %s", key, increment);
     return this.incr(key, -increment);
   }
 }
