@@ -9,7 +9,7 @@ npm install @leizm/distributed-events --save
 ## 使用
 
 ```typescript
-import { EventEmitter } from "@leizm/distributed-events";
+import EventEmitter from "@leizm/distributed-events";
 
 async function main() {
   // 创建实例

@@ -9,7 +9,7 @@ npm install @leizm/distributed-shared-data --save
 ## 使用
 
 ```typescript
-import { SharedData } from "@leizm/distributed-shared-data";
+import SharedData from "@leizm/distributed-shared-data";
 
 async function main() {
   // 创建实例
