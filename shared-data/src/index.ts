@@ -20,7 +20,7 @@ export interface Options {
 export const COUNTER_SYMBOL = Symbol("counter");
 export const READY_EVENT_SYMBOL = Symbol("ready event");
 
-export default class SharedData {
+export class SharedData {
   protected static [COUNTER_SYMBOL]: number = 0;
 
   protected readonly id: string = `${Date.now()}.${
@@ -270,3 +270,5 @@ export default class SharedData {
     return this.incr(key, -increment);
   }
 }
+
+export default SharedData;
