@@ -251,12 +251,12 @@ export default class SharedData {
    * @param key
    * @param increment
    */
-  public incr(key: string, increment: number = 1): Promise<any> {
+  public incr(key: string, increment: number = 1): Promise<number> {
     this.debug("incr %s", key);
     return this.redisPub.incrby(this.key(key), increment).then((value: any) => {
       value = Number(value);
       this.syncData.set(key, value);
-      return this.publishSyncDataEvent(key, value);
+      return this.publishSyncDataEvent(key, value).then(() => value);
     }) as any;
   }
 
@@ -265,7 +265,7 @@ export default class SharedData {
    * @param key
    * @param increment
    */
-  public decr(key: string, increment: number = 1): Promise<any> {
+  public decr(key: string, increment: number = 1): Promise<number> {
     this.debug("decr %s %s", key, increment);
     return this.incr(key, -increment);
   }

@@ -1,19 +1,19 @@
-# 分布式事件监听触发模块 @leizm/distributed-events
+# 分布式事件监听触发模块 @leizm/distributed-shared-data
 
 ## 安装
 
 ```bash
-npm install @leizm/distributed-events --save
+npm install @leizm/distributed-shared-data --save
 ```
 
 ## 使用
 
 ```typescript
-import { EventEmitter } from "@leizm/distributed-events";
+import { SharedData } from "@leizm/distributed-shared-data";
 
 async function main() {
   // 创建实例
-  const e = new EventEmitter({
+  const data = new SharedData({
     // Redis连接配置
     redis: {
       host: "127.0.0.1",
@@ -23,20 +23,28 @@ async function main() {
     },
     // 键前缀，默认空
     keyPrefix: "",
-    // 频道名称，默认为"events"，如果设置了前缀则会加上前缀
-    channelKey: "events"
+    // 频道名称，默认为":sync"，如果设置了前缀则会加上前缀
+    channelKey: ":sync"
   });
 
   // 等待初始化完成
-  await e.ready();
+  await data.ready();
 
-  // 注册事件监听
-  e.on("say hello", function(msg) {
-    console.log("say: %s", msg);
-  });
+  // 设置值
+  await data.set("a", 123);
 
-  // 触发事件
-  e.emit("say hello", "hahahahaha");
+  // 获取最新值
+  const a = await data.get("a");
+
+  // 获取当前缓存的值（如果值有变化，会自动同步，但可能在短时间内不一致）
+  const b = data.getSync("b");
+
+  // 值增减
+  const c = await data.incr("c");
+  const d = await data.decr("d");
+
+  // 获取原始redis实例，通过 key() 和 stripKeyPrefix() 来添加删除键前缀
+  const keys = (await data.redis.keys(data.key("*"))).map(k => data.stripKeyPredix(k));
 }
 ```
 
