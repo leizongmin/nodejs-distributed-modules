@@ -76,7 +76,7 @@ export default class SharedData {
           this.debug("ignore sync: %j", data);
           return;
         }
-        this.get(data.k).then(value => {
+        this.get(data.k, false).then(value => {
           this.debug("sync: %s=%j", data.k, value);
         });
       }
@@ -228,8 +228,8 @@ export default class SharedData {
   /**
    * 获取数据
    */
-  public get(key: string): Promise<any> {
-    if (this.syncData.has(key)) {
+  public get(key: string, useCache: boolean = true): Promise<any> {
+    if (useCache && this.syncData.has(key)) {
       return Promise.resolve(this.syncData.get(key));
     }
     return this.redisPub.get(this.key(key)).then(str => {
