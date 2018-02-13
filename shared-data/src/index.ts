@@ -77,7 +77,7 @@ export default class SharedData {
           return;
         }
         this.get(data.k).then(value => {
-          this.debug("sync: %s=%s", data.k, value);
+          this.debug("sync: %s=%j", data.k, value);
         });
       }
     });
@@ -108,7 +108,7 @@ export default class SharedData {
       .then((values: string[]) => {
         values.forEach((v, i) => {
           const k = this.stripKeyPrefix(keys[i]);
-          this.debug("init sync: %s=%s", k, v);
+          this.debug("init sync: %s=%j", k, v);
           try {
             v = JSON.parse(v);
           } catch (err) {
@@ -216,7 +216,7 @@ export default class SharedData {
    * 存储数据
    */
   public set(key: string, value: any): Promise<any> {
-    this.debug("set %s=%s", key, value);
+    this.debug("set %s=%j", key, value);
     const str = JSON.stringify(value);
     this.syncData.set(key, value);
     return this.redisPub
