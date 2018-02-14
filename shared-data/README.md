@@ -1,4 +1,4 @@
-# 分布式事件监听触发模块 @leizm/distributed-shared-data
+# 分布式数据共享同步模块 @leizm/distributed-shared-data
 
 ## 安装
 
