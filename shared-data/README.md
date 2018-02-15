@@ -39,6 +39,9 @@ async function main() {
   // 获取当前缓存的值（如果值有变化，会自动同步，但可能在短时间内不一致）
   const b = data.getSync("b");
 
+  // 删除值
+  await data.delete("a");
+
   // 值增减
   const c = await data.incr("c");
   const d = await data.decr("d");

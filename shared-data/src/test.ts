@@ -84,7 +84,7 @@ describe("test @leizm/distributed-shared-data", function() {
     data
       .ready()
       .then(async () => {
-        await data.redis.del(data.key("x"));
+        await data.delete("x");
 
         const updates: any[][] = [];
         data.on("update", (k, v) => updates.push([k, v]));
@@ -110,6 +110,27 @@ describe("test @leizm/distributed-shared-data", function() {
         done();
       })
       .catch(done);
+  });
+
+  it("delete", function(done) {
+    const data = new SharedData({
+      redis: { db: 1 }
+    });
+    data.ready().then(async () => {
+      await data.set("abc", 123);
+      await data.set("xyz", 456);
+
+      expect(await data.get("abc")).to.equal(123);
+      expect(await data.get("xyz")).to.equal(456);
+
+      await data.delete("abc");
+
+      expect(await data.get("abc")).to.equal(undefined);
+      expect(await data.get("xyz")).to.equal(456);
+
+      data.destroy();
+      done();
+    });
   });
 });
 

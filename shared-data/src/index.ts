@@ -63,6 +63,7 @@ export class SharedData {
         let data: {
           k: string;
           i: string;
+          d?: number;
         };
         try {
           data = JSON.parse(str);
@@ -77,6 +78,12 @@ export class SharedData {
           this.event.emit("update", data.k, this.getSync(data.k));
           return;
         }
+        // 删除数据
+        if (data.d === 1) {
+          this.debug("sync: delete %s", data.k);
+          this.syncData.delete(data.k);
+        }
+        // 更新数据
         this.get(data.k, false).then(value => {
           this.debug("sync: %s=%j", data.k, value);
           this.event.emit("update", data.k, value);
@@ -200,10 +207,16 @@ export class SharedData {
    * @param key
    * @param value
    */
-  protected publishSyncDataEvent(key: string, value: any): Promise<any> {
+  protected publishSyncDataEvent(
+    key: string,
+    value: any,
+    isDelete: boolean = false
+  ): Promise<any> {
     return this.redisPub.publish(
       this.channelKey,
-      JSON.stringify({ k: key, i: this.id })
+      JSON.stringify(
+        isDelete ? { k: key, i: this.id, d: 1 } : { k: key, i: this.id }
+      )
     ) as any;
   }
 
@@ -235,10 +248,24 @@ export class SharedData {
       return Promise.resolve(this.syncData.get(key));
     }
     return this.redisPub.get(this.key(key)).then(str => {
+      if (!str) return;
       const data = JSON.parse(str);
       this.syncData.set(key, data);
       return data;
     }) as any;
+  }
+
+  /**
+   * 删除数据
+   */
+  public delete(key: string): Promise<any> {
+    this.debug("delete %s=%j", key);
+    return this.redisPub.del(this.key(key)).then((ret: any) => {
+      return this.publishSyncDataEvent(key, 0, true).then(() => {
+        this.syncData.delete(key);
+        return ret;
+      });
+    });
   }
 
   /**
