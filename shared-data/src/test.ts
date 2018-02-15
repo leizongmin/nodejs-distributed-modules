@@ -161,7 +161,10 @@ describe("test @leizm/distributed-shared-data", function() {
           "sum:abc2",
           "sum:efg"
         ]);
-        expect(await data.keys("sum:abc*")).to.deep.equal(["sum:abc1", "sum:abc2"]);
+        expect(await data.keys("sum:abc*")).to.deep.equal([
+          "sum:abc1",
+          "sum:abc2"
+        ]);
         expect(await data.keys("sum:efg")).to.deep.equal(["sum:efg"]);
 
         expect(data.keysSync("sum:*")).to.deep.equal([
@@ -169,7 +172,10 @@ describe("test @leizm/distributed-shared-data", function() {
           "sum:abc2",
           "sum:efg"
         ]);
-        expect(data.keysSync("sum:abc*")).to.deep.equal(["sum:abc1", "sum:abc2"]);
+        expect(data.keysSync("sum:abc*")).to.deep.equal([
+          "sum:abc1",
+          "sum:abc2"
+        ]);
         expect(data.keysSync("sum:efg")).to.deep.equal(["sum:efg"]);
 
         expect(await data.sum("sum:*")).to.equal(123 + 456 + 111);
@@ -179,6 +185,46 @@ describe("test @leizm/distributed-shared-data", function() {
         expect(data.sumSync("sum:*")).to.equal(123 + 456 + 111);
         expect(data.sumSync("sum:abc*")).to.equal(123 + 456);
         expect(data.sumSync("sum:efg")).to.equal(111);
+
+        data.destroy();
+        done();
+      })
+      .catch(done);
+  });
+
+  it("watch & unwatch", function(done) {
+    const data = new SharedData({
+      redis: { db: 1 },
+      keyPrefix: randomPrefix()
+    });
+    data
+      .ready()
+      .then(async () => {
+        const list: any[][] = [];
+        data.watch("sum:*", (key, value, pattern) => {
+          expect(pattern).to.equal("sum:*");
+          expect(key).to.be.oneOf(["sum:abc1", "sum:abc2", "sum:efg"]);
+          expect(value).to.be.oneOf([123, 456, 111]);
+          list.push([key, value]);
+        });
+
+        await data.set("abc", 111111);
+        await data.set("sum:abc1", 123);
+        await data.set("sum:abc2", 456);
+        await data.set("sum:efg", 111);
+
+        data.unwatch("sum:*");
+
+        await data.set("abc", 111111);
+        await data.set("sum:abc1", 123);
+        await data.set("sum:abc2", 456);
+        await data.set("sum:efg", 111);
+
+        expect(list).to.deep.equal([
+          ["sum:abc1", 123],
+          ["sum:abc2", 456],
+          ["sum:efg", 111]
+        ]);
 
         data.destroy();
         done();

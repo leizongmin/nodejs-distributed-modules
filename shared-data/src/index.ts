@@ -17,6 +17,8 @@ export interface Options {
   channelKey?: string;
 }
 
+export type WatchHandler = (key: string, value: any, pattern: string) => void;
+
 export const COUNTER_SYMBOL = Symbol("counter");
 export const READY_EVENT_SYMBOL = Symbol("ready event");
 
@@ -35,6 +37,7 @@ export class SharedData {
   protected readonly syncData: Map<string, any> = new Map();
   protected isReady: boolean = false;
   protected isInitSync: boolean = false;
+  protected readonly watchPatterns: Map<string, RegExp> = new Map();
 
   constructor(options?: Options) {
     options = options || {};
@@ -43,12 +46,14 @@ export class SharedData {
       `@leizm:distributed-shared-data:#${SharedData[COUNTER_SYMBOL]}`
     );
 
+    // 键值
     this.keyPrefix = options.keyPrefix || "d:";
     this.channelKey = options.channelKey || ":sync";
     if (this.keyPrefix) {
       this.channelKey = this.keyPrefix + this.channelKey;
     }
 
+    // 初始化订阅Redis实例
     this.redisSub = new Redis(options.redis);
     if (options.redis && options.redis.db) {
       this.redisSub.select(options.redis.db);
@@ -96,6 +101,7 @@ export class SharedData {
       this.checkReady();
     });
 
+    // 初始化发布Redis实例
     this.redisPub = new Redis(options.redis);
     if (options.redis && options.redis.db) {
       this.redisPub.select(options.redis.db);
@@ -133,6 +139,22 @@ export class SharedData {
         this.debug("syncData.init.ready");
         this.checkReady();
       });
+
+    // 处理watch事件
+    this.on("update", (key: string, value: any) => {
+      for (const [pattern, reg] of this.watchPatterns.entries()) {
+        reg.lastIndex = 0;
+        if (reg.test(key)) {
+          this.debug(
+            "emit watch: pattern=%s, key=%s, value=%s",
+            pattern,
+            key,
+            value
+          );
+          this.event.emit(`update ${pattern}`, key, value, pattern);
+        }
+      }
+    });
 
     this.debug("create: %s", this.id);
   }
@@ -347,6 +369,32 @@ export class SharedData {
       reg.lastIndex = 0;
       return reg.test(k);
     });
+  }
+
+  /**
+   * 监听指定规则值的变化
+   * @param pattern 规则，比如：abc:*
+   * @param handler 处理函数
+   */
+  public watch(pattern: string, handler: WatchHandler): this {
+    this.debug("watch: pattern=%s handler=%s", pattern, handler);
+    if (!this.watchPatterns.has(pattern)) {
+      const reg = parseKeyPattern(pattern);
+      this.watchPatterns.set(pattern, reg);
+    }
+    this.event.on(`update ${pattern}`, handler);
+    return this;
+  }
+
+  /**
+   * 取消监听指定规则变化
+   * @param pattern 规则，比如：abc:*
+   */
+  public unwatch(pattern: string): this {
+    this.debug("unwatch: pattern=%s", pattern);
+    this.watchPatterns.delete(pattern);
+    this.event.removeAllListeners(`update ${pattern}`);
+    return this;
   }
 }
 
