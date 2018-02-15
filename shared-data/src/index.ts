@@ -74,10 +74,12 @@ export class SharedData {
         // 如果同步请求来自当前客户端（通过ID判断），则忽略此次更新
         if (data.i === this.id) {
           this.debug("ignore sync: %j", data);
+          this.event.emit("update", data.k, this.getSync(data.k));
           return;
         }
         this.get(data.k, false).then(value => {
           this.debug("sync: %s=%j", data.k, value);
+          this.event.emit("update", data.k, value);
         });
       }
     });

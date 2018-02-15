@@ -43,8 +43,15 @@ async function main() {
   const c = await data.incr("c");
   const d = await data.decr("d");
 
+  // 当有更新数据时，会触发update事件
+  data.on("update", (key, value) => {
+    console.log("update: %s = %s", key, value);
+  });
+
   // 获取原始redis实例，通过 key() 和 stripKeyPrefix() 来添加删除键前缀
-  const keys = (await data.redis.keys(data.key("*"))).map(k => data.stripKeyPredix(k));
+  const keys = (await data.redis.keys(data.key("*"))).map(k =>
+    data.stripKeyPredix(k)
+  );
 }
 ```
 

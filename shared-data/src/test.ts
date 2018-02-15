@@ -84,7 +84,10 @@ describe("test @leizm/distributed-shared-data", function() {
     data
       .ready()
       .then(async () => {
-        await data.redis.del(data.key('x'));
+        await data.redis.del(data.key("x"));
+
+        const updates: any[][] = [];
+        data.on("update", (k, v) => updates.push([k, v]));
 
         expect(await data.incr("x")).to.equal(1);
         expect(await data.incr("x")).to.equal(2);
@@ -93,9 +96,25 @@ describe("test @leizm/distributed-shared-data", function() {
         expect(await data.decr("x")).to.equal(2);
         expect(await data.decr("x", 3)).to.equal(-1);
 
+        await sleep(100);
+        expect(updates).to.deep.equal([
+          ["x", 1],
+          ["x", 2],
+          ["x", 4],
+          ["x", 3],
+          ["x", 2],
+          ["x", -1]
+        ]);
+
         data.destroy();
         done();
       })
       .catch(done);
   });
 });
+
+function sleep(ms: number) {
+  return new Promise((resolve, reject) => {
+    setTimeout(resolve, ms);
+  });
+}
