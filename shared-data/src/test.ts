@@ -7,10 +7,15 @@
 import { expect } from "chai";
 import SharedData from "./index";
 
+function randomPrefix(): string {
+  return String(Math.random()) + ":";
+}
+
 describe("test @leizm/distributed-shared-data", function() {
   it("base", function(done) {
     const data = new SharedData({
-      redis: { db: 1 }
+      redis: { db: 1 },
+      keyPrefix: randomPrefix()
     });
     data
       .ready()
@@ -53,7 +58,8 @@ describe("test @leizm/distributed-shared-data", function() {
 
   it("cocurrent set()", function(done) {
     const data = new SharedData({
-      redis: { db: 1 }
+      redis: { db: 1 },
+      keyPrefix: randomPrefix()
     });
     data
       .ready()
@@ -79,7 +85,8 @@ describe("test @leizm/distributed-shared-data", function() {
 
   it("incr & decr", function(done) {
     const data = new SharedData({
-      redis: { db: 1 }
+      redis: { db: 1 },
+      keyPrefix: randomPrefix()
     });
     data
       .ready()
@@ -114,23 +121,53 @@ describe("test @leizm/distributed-shared-data", function() {
 
   it("delete", function(done) {
     const data = new SharedData({
-      redis: { db: 1 }
+      redis: { db: 1 },
+      keyPrefix: randomPrefix()
     });
-    data.ready().then(async () => {
-      await data.set("abc", 123);
-      await data.set("xyz", 456);
+    data
+      .ready()
+      .then(async () => {
+        await data.set("abc", 123);
+        await data.set("xyz", 456);
 
-      expect(await data.get("abc")).to.equal(123);
-      expect(await data.get("xyz")).to.equal(456);
+        expect(await data.get("abc")).to.equal(123);
+        expect(await data.get("xyz")).to.equal(456);
 
-      await data.delete("abc");
+        await data.delete("abc");
 
-      expect(await data.get("abc")).to.equal(undefined);
-      expect(await data.get("xyz")).to.equal(456);
+        expect(await data.get("abc")).to.equal(undefined);
+        expect(await data.get("xyz")).to.equal(456);
 
-      data.destroy();
-      done();
+        data.destroy();
+        done();
+      })
+      .catch(done);
+  });
+
+  it("sum & sumSync", function(done) {
+    const data = new SharedData({
+      redis: { db: 1 },
+      keyPrefix: randomPrefix()
     });
+    data
+      .ready()
+      .then(async () => {
+        await data.set("sum:abc1", 123);
+        await data.set("sum:abc2", 456);
+        await data.set("sum:efg", 111);
+
+        expect(await data.sum("sum:*")).to.equal(123 + 456 + 111);
+        expect(await data.sum("sum:abc*")).to.equal(123 + 456);
+        expect(await data.sum("sum:efg")).to.equal(111);
+
+        expect(data.sumSync("sum:*")).to.equal(123 + 456 + 111);
+        expect(data.sumSync("sum:abc*")).to.equal(123 + 456);
+        expect(data.sumSync("sum:efg")).to.equal(111);
+
+        data.destroy();
+        done();
+      })
+      .catch(done);
   });
 });
 

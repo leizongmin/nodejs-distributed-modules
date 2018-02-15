@@ -298,6 +298,51 @@ export class SharedData {
     this.debug("decr %s %s", key, increment);
     return this.incr(key, -increment);
   }
+
+  /**
+   * 获取指定规则key列表的和值
+   * @param pattern 比如：abc:*
+   */
+  public sum(pattern: string): Promise<number> {
+    return this.redisPub
+      .keys(this.key(pattern))
+      .then(keys => this.redis.mget(...keys))
+      .then((values: any[]) =>
+        values.map(v => Number(v)).reduce((a, b) => a + b)
+      ) as any;
+  }
+
+  /**
+   * 同步获取指定规则key列表的和值
+   * @param pattern 比如：abc:*
+   */
+  public sumSync(pattern: string): number {
+    const reg = parseKeyPattern(pattern);
+    return Array.from(this.syncData.entries())
+      .filter(([k, v]) => {
+        reg.lastIndex = 0;
+        return reg.test(k);
+      })
+      .map(([k, v]) => Number(v))
+      .reduce((a, b) => a + b);
+  }
+}
+
+/**
+ * 正则表达式转义
+ * @param str
+ */
+function escapeString(str: string): string {
+  return str.replace(/([.+*?=^!:${}()[\]|/\\])/g, "\\$1");
+}
+
+/**
+ * 将Key规则转换为正则表达式
+ * @param pattern
+ */
+function parseKeyPattern(pattern: string): RegExp {
+  const s = "^" + escapeString(pattern).replace(/\\\*/g, "(.*)") + "$";
+  return new RegExp(s, "g");
 }
 
 export default SharedData;
