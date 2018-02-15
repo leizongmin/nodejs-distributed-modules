@@ -156,13 +156,21 @@ describe("test @leizm/distributed-shared-data", function() {
         await data.set("sum:abc2", 456);
         await data.set("sum:efg", 111);
 
-        expect(data.keys("sum:*")).to.deep.equal([
+        expect(await data.keys("sum:*")).to.deep.equal([
           "sum:abc1",
           "sum:abc2",
           "sum:efg"
         ]);
-        expect(data.keys("sum:abc*")).to.deep.equal(["sum:abc1", "sum:abc2"]);
-        expect(data.keys("sum:efg")).to.deep.equal(["sum:efg"]);
+        expect(await data.keys("sum:abc*")).to.deep.equal(["sum:abc1", "sum:abc2"]);
+        expect(await data.keys("sum:efg")).to.deep.equal(["sum:efg"]);
+
+        expect(data.keysSync("sum:*")).to.deep.equal([
+          "sum:abc1",
+          "sum:abc2",
+          "sum:efg"
+        ]);
+        expect(data.keysSync("sum:abc*")).to.deep.equal(["sum:abc1", "sum:abc2"]);
+        expect(data.keysSync("sum:efg")).to.deep.equal(["sum:efg"]);
 
         expect(await data.sum("sum:*")).to.equal(123 + 456 + 111);
         expect(await data.sum("sum:abc*")).to.equal(123 + 456);

@@ -331,7 +331,17 @@ export class SharedData {
    * 获取指定规则Key列表
    * @param pattern 规则，比如：abc:*
    */
-  public keys(pattern: string): string[] {
+  public keys(pattern: string): Promise<string[]> {
+    return this.redis
+      .keys(this.key(pattern))
+      .then(keys => keys.map(k => this.stripKeyPrefix(k)).sort()) as any;
+  }
+
+  /**
+   * 获取指定规则Key列表
+   * @param pattern 规则，比如：abc:*
+   */
+  public keysSync(pattern: string): string[] {
     const reg = parseKeyPattern(pattern);
     return Array.from(this.syncData.keys()).filter(k => {
       reg.lastIndex = 0;
