@@ -314,7 +314,7 @@ export class SharedData {
 
   /**
    * 同步获取指定规则key列表的和值
-   * @param pattern 比如：abc:*
+   * @param pattern 规则，比如：abc:*
    */
   public sumSync(pattern: string): number {
     const reg = parseKeyPattern(pattern);
@@ -325,6 +325,18 @@ export class SharedData {
       })
       .map(([k, v]) => Number(v))
       .reduce((a, b) => a + b);
+  }
+
+  /**
+   * 获取指定规则Key列表
+   * @param pattern 规则，比如：abc:*
+   */
+  public keys(pattern: string): string[] {
+    const reg = parseKeyPattern(pattern);
+    return Array.from(this.syncData.keys()).filter(k => {
+      reg.lastIndex = 0;
+      return reg.test(k);
+    });
   }
 }
 
