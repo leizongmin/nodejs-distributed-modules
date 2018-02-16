@@ -201,18 +201,20 @@ describe("test @leizm/distributed-shared-data", function() {
       .ready()
       .then(async () => {
         const list: any[][] = [];
-        data.watch("sum:*", (key, value, pattern) => {
+        data.watch("sum:*", (type, key, value, pattern) => {
           expect(pattern).to.equal("sum:*");
           expect(key).to.be.oneOf(["sum:abc1", "sum:abc2", "sum:efg"]);
-          expect(value).to.be.oneOf([123, 456, 111]);
-          list.push([key, value]);
+          expect(value).to.be.oneOf([123, 456, 111, undefined]);
+          list.push([type, key, value]);
         });
 
         await data.set("abc", 111111);
         await data.set("sum:abc1", 123);
         await data.set("sum:abc2", 456);
         await data.set("sum:efg", 111);
+        await data.delete("sum:abc1");
 
+        await sleep(100);
         data.unwatch("sum:*");
 
         await data.set("abc", 111111);
@@ -221,9 +223,10 @@ describe("test @leizm/distributed-shared-data", function() {
         await data.set("sum:efg", 111);
 
         expect(list).to.deep.equal([
-          ["sum:abc1", 123],
-          ["sum:abc2", 456],
-          ["sum:efg", 111]
+          ["update", "sum:abc1", 123],
+          ["update", "sum:abc2", 456],
+          ["update", "sum:efg", 111],
+          ["delete", "sum:abc1", undefined]
         ]);
 
         data.destroy();

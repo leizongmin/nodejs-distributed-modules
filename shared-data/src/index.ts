@@ -17,7 +17,12 @@ export interface Options {
   channelKey?: string;
 }
 
-export type WatchHandler = (key: string, value: any, pattern: string) => void;
+export type WatchHandler = (
+  type: "update" | "delete",
+  key: string,
+  value: any,
+  pattern: string
+) => void;
 
 export const COUNTER_SYMBOL = Symbol("counter");
 export const READY_EVENT_SYMBOL = Symbol("ready event");
@@ -80,13 +85,19 @@ export class SharedData {
         // 如果同步请求来自当前客户端（通过ID判断），则忽略此次更新
         if (data.i === this.id) {
           this.debug("ignore sync: %j", data);
-          this.event.emit("update", data.k, this.getSync(data.k));
+          if (data.d === 1) {
+            this.event.emit("delete", data.k);
+          } else {
+            this.event.emit("update", data.k, this.getSync(data.k));
+          }
           return;
         }
         // 删除数据
         if (data.d === 1) {
           this.debug("sync: delete %s", data.k);
           this.syncData.delete(data.k);
+          this.event.emit("delete", data.k);
+          return;
         }
         // 更新数据
         this.get(data.k, false).then(value => {
@@ -141,17 +152,31 @@ export class SharedData {
       });
 
     // 处理watch事件
-    this.on("update", (key: string, value: any) => {
+    this.event.on("update", (key: string, value: any) => {
       for (const [pattern, reg] of this.watchPatterns.entries()) {
         reg.lastIndex = 0;
         if (reg.test(key)) {
           this.debug(
-            "emit watch: pattern=%s, key=%s, value=%s",
+            "emit watch: type=update, pattern=%s, key=%s, value=%s",
             pattern,
             key,
             value
           );
-          this.event.emit(`update ${pattern}`, key, value, pattern);
+          this.event.emit(`watch ${pattern}`, "update", key, value, pattern);
+        }
+      }
+    });
+    this.event.on("delete", (key: string, value: any) => {
+      for (const [pattern, reg] of this.watchPatterns.entries()) {
+        reg.lastIndex = 0;
+        if (reg.test(key)) {
+          this.debug(
+            "emit watch: type=delete, pattern=%s, key=%s, value=%s",
+            pattern,
+            key,
+            value
+          );
+          this.event.emit(`watch ${pattern}`, "delete", key, value, pattern);
         }
       }
     });
@@ -329,9 +354,10 @@ export class SharedData {
     return this.redisPub
       .keys(this.key(pattern))
       .then(keys => this.redis.mget(...keys))
-      .then((values: any[]) =>
-        values.map(v => Number(v)).reduce((a, b) => a + b)
-      ) as any;
+      .then((values: any[]) => {
+        if (values.length < 1) return 0;
+        return values.map(v => Number(v)).reduce((a, b) => a + b);
+      }) as any;
   }
 
   /**
@@ -340,13 +366,12 @@ export class SharedData {
    */
   public sumSync(pattern: string): number {
     const reg = parseKeyPattern(pattern);
-    return Array.from(this.syncData.entries())
-      .filter(([k, v]) => {
-        reg.lastIndex = 0;
-        return reg.test(k);
-      })
-      .map(([k, v]) => Number(v))
-      .reduce((a, b) => a + b);
+    const list = Array.from(this.syncData.entries()).filter(([k, v]) => {
+      reg.lastIndex = 0;
+      return reg.test(k);
+    });
+    if (list.length < 1) return 0;
+    return list.map(([k, v]) => Number(v)).reduce((a, b) => a + b);
   }
 
   /**
@@ -382,7 +407,7 @@ export class SharedData {
       const reg = parseKeyPattern(pattern);
       this.watchPatterns.set(pattern, reg);
     }
-    this.event.on(`update ${pattern}`, handler);
+    this.event.on(`watch ${pattern}`, handler);
     return this;
   }
 
@@ -393,7 +418,7 @@ export class SharedData {
   public unwatch(pattern: string): this {
     this.debug("unwatch: pattern=%s", pattern);
     this.watchPatterns.delete(pattern);
-    this.event.removeAllListeners(`update ${pattern}`);
+    this.event.removeAllListeners(`watch ${pattern}`);
     return this;
   }
 }
