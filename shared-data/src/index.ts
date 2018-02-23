@@ -15,6 +15,8 @@ export interface Options {
   keyPrefix?: string;
   /** 频道名称，默认为":sync"，如果设置了前缀则会加上前缀 */
   channelKey?: string;
+  /** 自定义ID，用于唯一标识当前客户端 */
+  id?: string;
 }
 
 export type WatchHandler = (
@@ -30,9 +32,7 @@ export const READY_EVENT_SYMBOL = Symbol("ready event");
 export class SharedData {
   protected static [COUNTER_SYMBOL]: number = 0;
 
-  protected readonly id: string = `${Date.now()}.${process.pid}.${Math.floor(
-    Math.random() * 1000000
-  )}`;
+  protected readonly id: string;
   protected readonly debug: debug.IDebugger;
   protected readonly event: events.EventEmitter = new events.EventEmitter();
   protected readonly keyPrefix: string;
@@ -57,6 +57,9 @@ export class SharedData {
     if (this.keyPrefix) {
       this.channelKey = this.keyPrefix + this.channelKey;
     }
+    this.id =
+      options.id ||
+      `${Date.now()}.${process.pid}.${Math.floor(Math.random() * 1000000)}`;
 
     // 初始化订阅Redis实例
     this.redisSub = new Redis(options.redis);

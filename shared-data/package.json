@@ -1,6 +1,6 @@
 {
   "name": "@leizm/distributed-shared-data",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "分布式共享数据表",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
