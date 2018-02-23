@@ -92,4 +92,34 @@ describe("test @leizm/distributed-events", function() {
       })
       .catch(done);
   });
+
+  it("private", function(done) {
+    const e1 = new EventEmitter();
+    const e2 = new EventEmitter();
+    expect(e1.id).not.equal(e2.id);
+    Promise.all([e1.ready(), e2.ready()])
+      .then(() => {
+        const list: any[] = [];
+        e1.onPrivate((sid, ...data) => {
+          expect(sid).to.equal(e2.id);
+          list.push(data);
+        });
+        e1.on("end", () => {
+          expect(list).to.deep.equal([
+            [123, 456],
+            ["a"],
+            [true, false, null, 789]
+          ]);
+
+          e1.destroy();
+          e2.destroy();
+          done();
+        });
+        e2.sendPrivate(e1.id, 123, 456);
+        e2.sendPrivate(e1.id, "a");
+        e2.sendPrivate(e1.id, true, false, null, 789);
+        e2.emit("end");
+      })
+      .catch(done);
+  });
 });

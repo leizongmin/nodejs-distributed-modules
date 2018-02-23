@@ -15,23 +15,27 @@ export interface Options {
   keyPrefix?: string;
   /** 频道名称，默认为"events"，如果设置了前缀则会加上前缀 */
   channelKey?: string;
+  /** 自定义ID，用于唯一标识当前客户端 */
+  id?: string;
 }
 
 export const COUNTER_SYMBOL = Symbol("counter");
 export const READY_EVENT_SYMBOL = Symbol("ready event");
+export const PRIVATE_EVENT_SYMBOL = Symbol("private event");
 
 export class EventEmitter {
   protected static [COUNTER_SYMBOL]: number = 0;
 
-  protected readonly id: string = `${Date.now()}.${
-    process.pid
-  }.${Math.random()}`;
+  public readonly id: string;
+
   protected readonly debug: debug.IDebugger;
   protected readonly event: events.EventEmitter = new events.EventEmitter();
   protected readonly channelKey: string;
+  protected readonly privateChannelKey: string;
   protected readonly redisSub: Redis.Redis;
   protected readonly redisPub: Redis.Redis;
   protected isReady: boolean = false;
+  protected isPrivateReady: boolean = false;
 
   constructor(options?: Options) {
     options = options || {};
@@ -40,10 +44,15 @@ export class EventEmitter {
       `@leizm:distributed-events:#${EventEmitter[COUNTER_SYMBOL]}`
     );
 
+    this.id =
+      options.id ||
+      `${Date.now()}.${process.pid}.${Math.floor(Math.random() * 1000000)}`;
+
     this.channelKey = options.channelKey || "events";
     if (options.keyPrefix) {
       this.channelKey = options.keyPrefix + this.channelKey;
     }
+    this.privateChannelKey = this.getPrivateChannelKey(this.id);
 
     this.redisSub = new Redis(options.redis);
     if (options.redis && options.redis.db) {
@@ -56,6 +65,7 @@ export class EventEmitter {
     this.redisSub.on("message", (ch, str) => {
       this.debug("redisSub.onmessage => ch=%s str=%s", ch, str);
       if (ch === this.channelKey) {
+        // 触发事件
         let data: {
           e: string;
           a: any;
@@ -63,16 +73,34 @@ export class EventEmitter {
         try {
           data = JSON.parse(str);
         } catch (err) {
-          this.debug("redisSub.onmessage => JSON.parse %s", err);
+          this.debug("events => JSON.parse %s", err);
           return;
         }
         this.event.emit(data.e, ...data.a);
+      } else if (ch === this.privateChannelKey) {
+        // 私人消息
+        let data: {
+          i: string;
+          a: any;
+        };
+        try {
+          data = JSON.parse(str);
+        } catch (err) {
+          this.debug("private => JSON.parse %s", err);
+          return;
+        }
+        this.event.emit(PRIVATE_EVENT_SYMBOL, data.i, ...data.a);
       }
     });
     this.redisSub.subscribe(this.channelKey, () => {
-      this.debug("redisSub.subscribe.ready");
+      this.debug("redisSub.subscribe.ready events");
       this.isReady = true;
-      this.event.emit(READY_EVENT_SYMBOL);
+      this.checkReady();
+    });
+    this.redisSub.subscribe(this.privateChannelKey, () => {
+      this.debug("redisSub.subscribe.ready private");
+      this.isPrivateReady = true;
+      this.checkReady();
     });
 
     this.redisPub = new Redis(options.redis);
@@ -83,6 +111,14 @@ export class EventEmitter {
       this.debug("redisPub.on(error) => %s", err);
       this.event.emit("error", err);
     });
+  }
+
+  /**
+   * 获取私人频道Key
+   * @param id
+   */
+  protected getPrivateChannelKey(id: string): string {
+    return `${this.channelKey}:${id}`;
   }
 
   /**
@@ -121,11 +157,42 @@ export class EventEmitter {
   }
 
   /**
+   * 监听私人消息
+   * @param listener 回调函数
+   */
+  public onPrivate(listener: (senderId: string, ...args: any[]) => void): this {
+    this.event.on(PRIVATE_EVENT_SYMBOL, listener);
+    return this;
+  }
+
+  /**
+   * 发送私人消息
+   * @param receiverId 接收者ID
+   * @param data 数据
+   */
+  public sendPrivate(receiverId: string, ...args: any[]): this {
+    this.redisPub.publish(
+      this.getPrivateChannelKey(receiverId),
+      JSON.stringify({ i: this.id, a: args })
+    );
+    return this;
+  }
+
+  /**
+   * 检查是否就绪
+   */
+  protected checkReady() {
+    if (this.isReady && this.isPrivateReady) {
+      this.event.emit(READY_EVENT_SYMBOL);
+    }
+  }
+
+  /**
    * 等待就绪
    */
   public ready(): Promise<void> {
     return new Promise((resolve, reject) => {
-      if (this.isReady) return resolve();
+      if (this.isReady && this.isPrivateReady) return resolve();
       this.event.once(READY_EVENT_SYMBOL, resolve);
     });
   }

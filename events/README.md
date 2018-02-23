@@ -37,6 +37,14 @@ async function main() {
 
   // 触发事件
   e.emit("say hello", "hahahahaha");
+
+  // 监听私人消息
+  e.onPrivate(function(senderId, msg) {
+    console.log("from %s: %s", senderId, msg);
+  });
+
+  // 发送私人消息
+  e.sendPrivate(id, msg);
 }
 ```
 

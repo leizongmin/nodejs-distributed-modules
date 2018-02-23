@@ -30,9 +30,9 @@ export const READY_EVENT_SYMBOL = Symbol("ready event");
 export class SharedData {
   protected static [COUNTER_SYMBOL]: number = 0;
 
-  protected readonly id: string = `${Date.now()}.${
-    process.pid
-  }.${Math.random()}`;
+  protected readonly id: string = `${Date.now()}.${process.pid}.${Math.floor(
+    Math.random() * 1000000
+  )}`;
   protected readonly debug: debug.IDebugger;
   protected readonly event: events.EventEmitter = new events.EventEmitter();
   protected readonly keyPrefix: string;
