@@ -128,7 +128,7 @@ export class SharedData {
     // 初始化时自动全量同步数据
     let keys: string[];
     this.redisPub
-      .keys("d:*")
+      .keys(this.key("d:*"))
       .then(ret => {
         keys = ret;
         if (keys.length < 1) return [];
@@ -350,7 +350,7 @@ export class SharedData {
   }
 
   /**
-   * 获取指定规则key列表的和值
+   * 获取指定规则key列表的和值（可能有性能问题，慎用）
    * @param pattern 比如：abc:*
    */
   public sum(pattern: string): Promise<number> {
@@ -378,7 +378,7 @@ export class SharedData {
   }
 
   /**
-   * 获取指定规则Key列表
+   * 获取指定规则Key列表（可能有性能问题，慎用）
    * @param pattern 规则，比如：abc:*
    */
   public keys(pattern: string): Promise<string[]> {
