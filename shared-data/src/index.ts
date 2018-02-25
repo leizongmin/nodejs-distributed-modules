@@ -473,6 +473,9 @@ export class LiveDataSet {
     seconds: number
   ): Promise<any> {
     const parent = this.parent;
+    if (data === null || typeof data === "undefined") {
+      return Promise.reject(new TypeError(`data cannot be null or undefined`));
+    }
     return parent.redis
       .multi()
       .setex(this.getItemKey(key, name), seconds, JSON.stringify(data))
@@ -532,7 +535,9 @@ export class LiveDataSet {
   public getAlive(key: string): Promise<Array<{ name: string; value: any }>> {
     return this.getAliveNames(key).then(names =>
       this.getItems(key, ...names).then(values =>
-        values.map((v, i) => ({ name: names[i], value: v }))
+        values
+          .map((v, i) => ({ name: names[i], value: v }))
+          .filter(v => v.value !== null)
       )
     );
   }
