@@ -529,7 +529,7 @@ export class LiveDataSet {
    * 获取当前活跃的数据列表
    * @param key
    */
-  public getAlive(key: string): Promise<any[]> {
+  public getAlive(key: string): Promise<Array<{ name: string; value: any }>> {
     return this.getAliveNames(key).then(names =>
       this.getItems(key, ...names).then(values =>
         values.map((v, i) => ({ name: names[i], value: v }))
