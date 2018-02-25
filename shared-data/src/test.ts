@@ -50,6 +50,14 @@ describe("test @leizm/distributed-shared-data", function() {
         expect(data.getSync("a")).to.equal(123);
         expect(data.getSync("b")).to.equal(456);
 
+        const data2 = new SharedData({
+          redis: { db: 1 },
+          keyPrefix: data.key("")
+        });
+        await data2.ready();
+        expect(data2.getSync("a")).to.equal(123);
+        expect(data2.getSync("b")).to.equal(456);
+
         data.destroy();
         done();
       })
@@ -181,10 +189,12 @@ describe("test @leizm/distributed-shared-data", function() {
         expect(await data.sum("sum:*")).to.equal(123 + 456 + 111);
         expect(await data.sum("sum:abc*")).to.equal(123 + 456);
         expect(await data.sum("sum:efg")).to.equal(111);
+        expect(await data.sum("xxxxx")).to.equal(0);
 
         expect(data.sumSync("sum:*")).to.equal(123 + 456 + 111);
         expect(data.sumSync("sum:abc*")).to.equal(123 + 456);
         expect(data.sumSync("sum:efg")).to.equal(111);
+        expect(await data.sumSync("xxxxx")).to.equal(0);
 
         data.destroy();
         done();
@@ -228,6 +238,59 @@ describe("test @leizm/distributed-shared-data", function() {
           ["update", "sum:efg", 111],
           ["delete", "sum:abc1", undefined]
         ]);
+
+        data.destroy();
+        done();
+      })
+      .catch(done);
+  });
+
+  it("liveSet", function(done) {
+    const data = new SharedData({
+      redis: { db: 1 },
+      keyPrefix: randomPrefix()
+    });
+    data
+      .ready()
+      .then(async () => {
+        expect(await data.liveSet.getAliveNames("a")).to.deep.equal([]);
+        expect(await data.liveSet.getAlive("a")).to.deep.equal([]);
+
+        await data.liveSet.set("a", "123", 123456, 1);
+        await data.liveSet.set("a", "456", "abc", 2);
+        await data.liveSet.set("a", "789", "666", 2);
+        expect(await data.liveSet.getAliveNames("a")).to.deep.equal([
+          "123",
+          "456",
+          "789"
+        ]);
+        expect(await data.liveSet.getAlive("a")).to.deep.equal([
+          { name: "123", value: 123456 },
+          { name: "456", value: "abc" },
+          { name: "789", value: "666" }
+        ]);
+        expect(await data.liveSet.getAliveNames("b")).to.deep.equal([]);
+
+        await sleep(1200);
+        expect(await data.liveSet.getAliveNames("a")).to.deep.equal([
+          "456",
+          "789"
+        ]);
+        expect(await data.liveSet.getAlive("a")).to.deep.equal([
+          { name: "456", value: "abc" },
+          { name: "789", value: "666" }
+        ]);
+
+        await data.liveSet.set("a", "789", "666", 2);
+        await sleep(1000);
+        expect(await data.liveSet.getAliveNames("a")).to.deep.equal(["789"]);
+        expect(await data.liveSet.getAlive("a")).to.deep.equal([
+          { name: "789", value: "666" }
+        ]);
+
+        await sleep(2000);
+        expect(await data.liveSet.getAliveNames("a")).to.deep.equal([]);
+        expect(await data.liveSet.getAlive("a")).to.deep.equal([]);
 
         data.destroy();
         done();

@@ -28,6 +28,8 @@ export type WatchHandler = (
 
 export const COUNTER_SYMBOL = Symbol("counter");
 export const READY_EVENT_SYMBOL = Symbol("ready event");
+export const SYNC_DATA_KEY_PREFIX = "s:";
+export const LIVE_DATA_KEY_PREFIX = "l:";
 
 export class SharedData {
   protected static [COUNTER_SYMBOL]: number = 0;
@@ -43,6 +45,8 @@ export class SharedData {
   protected isReady: boolean = false;
   protected isInitSync: boolean = false;
   protected readonly watchPatterns: Map<string, RegExp> = new Map();
+
+  public readonly liveSet: LiveDataSet;
 
   constructor(options?: Options) {
     options = options || {};
@@ -60,6 +64,8 @@ export class SharedData {
     this.id =
       options.id ||
       `${Date.now()}.${process.pid}.${Math.floor(Math.random() * 1000000)}`;
+
+    this.liveSet = new LiveDataSet(this, this.debug);
 
     // 初始化订阅Redis实例
     this.redisSub = new Redis(options.redis);
@@ -128,7 +134,7 @@ export class SharedData {
     // 初始化时自动全量同步数据
     let keys: string[];
     this.redisPub
-      .keys(this.key("d:*"))
+      .keys(this.key(SYNC_DATA_KEY_PREFIX, "*"))
       .then(ret => {
         keys = ret;
         if (keys.length < 1) return [];
@@ -136,7 +142,7 @@ export class SharedData {
       })
       .then((values: string[]) => {
         values.forEach((v, i) => {
-          const k = this.stripKeyPrefix(keys[i]);
+          const k = this.stripKeyPrefix(keys[i], SYNC_DATA_KEY_PREFIX.length);
           this.debug("init sync: %s=%j", k, v);
           try {
             v = JSON.parse(v);
@@ -234,22 +240,24 @@ export class SharedData {
   public destroy() {
     this.redisPub.disconnect();
     this.redisSub.disconnect();
+    this.syncData.clear();
   }
 
   /**
    * 添加键前缀
-   * @param key
+   * @param keys
    */
-  public key(key: string): string {
-    return this.keyPrefix + key;
+  public key(...keys: string[]): string {
+    return this.keyPrefix + keys.join("");
   }
 
   /**
    * 去除键前缀
    * @param key
+   * @param additionalLength
    */
-  public stripKeyPrefix(key: string): string {
-    return key.slice(this.keyPrefix.length);
+  public stripKeyPrefix(key: string, additionalLength: number = 0): string {
+    return key.slice(this.keyPrefix.length + additionalLength);
   }
 
   /**
@@ -285,7 +293,7 @@ export class SharedData {
     const str = JSON.stringify(value);
     this.syncData.set(key, value);
     return this.redisPub
-      .set(this.key(key), str)
+      .set(this.key(SYNC_DATA_KEY_PREFIX, key), str)
       .then(() => this.publishSyncDataEvent(key, value))
       .then(() => value);
   }
@@ -297,7 +305,7 @@ export class SharedData {
     if (useCache && this.syncData.has(key)) {
       return Promise.resolve(this.syncData.get(key));
     }
-    return this.redisPub.get(this.key(key)).then(str => {
+    return this.redisPub.get(this.key(SYNC_DATA_KEY_PREFIX, key)).then(str => {
       if (!str) return;
       const data = JSON.parse(str);
       this.syncData.set(key, data);
@@ -310,12 +318,14 @@ export class SharedData {
    */
   public delete(key: string): Promise<any> {
     this.debug("delete %s=%j", key);
-    return this.redisPub.del(this.key(key)).then((ret: any) => {
-      return this.publishSyncDataEvent(key, 0, true).then(() => {
-        this.syncData.delete(key);
-        return ret;
+    return this.redisPub
+      .del(this.key(SYNC_DATA_KEY_PREFIX, key))
+      .then((ret: any) => {
+        return this.publishSyncDataEvent(key, 0, true).then(() => {
+          this.syncData.delete(key);
+          return ret;
+        });
       });
-    });
   }
 
   /**
@@ -332,11 +342,13 @@ export class SharedData {
    */
   public incr(key: string, increment: number = 1): Promise<number> {
     this.debug("incr %s", key);
-    return this.redisPub.incrby(this.key(key), increment).then((value: any) => {
-      value = Number(value);
-      this.syncData.set(key, value);
-      return this.publishSyncDataEvent(key, value).then(() => value);
-    }) as any;
+    return this.redisPub
+      .incrby(this.key(SYNC_DATA_KEY_PREFIX, key), increment)
+      .then((value: any) => {
+        value = Number(value);
+        this.syncData.set(key, value);
+        return this.publishSyncDataEvent(key, value).then(() => value);
+      }) as any;
   }
 
   /**
@@ -355,8 +367,11 @@ export class SharedData {
    */
   public sum(pattern: string): Promise<number> {
     return this.redisPub
-      .keys(this.key(pattern))
-      .then(keys => this.redis.mget(...keys))
+      .keys(this.key(SYNC_DATA_KEY_PREFIX, pattern))
+      .then(keys => {
+        if (keys.length < 1) return [];
+        return this.redis.mget(...keys);
+      })
       .then((values: any[]) => {
         if (values.length < 1) return 0;
         return values.map(v => Number(v)).reduce((a, b) => a + b);
@@ -383,8 +398,12 @@ export class SharedData {
    */
   public keys(pattern: string): Promise<string[]> {
     return this.redis
-      .keys(this.key(pattern))
-      .then(keys => keys.map(k => this.stripKeyPrefix(k)).sort()) as any;
+      .keys(this.key(SYNC_DATA_KEY_PREFIX, pattern))
+      .then(keys =>
+        keys
+          .map(k => this.stripKeyPrefix(k, SYNC_DATA_KEY_PREFIX.length))
+          .sort()
+      ) as any;
   }
 
   /**
@@ -423,6 +442,124 @@ export class SharedData {
     this.watchPatterns.delete(pattern);
     this.event.removeAllListeners(`watch ${pattern}`);
     return this;
+  }
+}
+
+export class LiveDataSet {
+  constructor(
+    public readonly parent: SharedData,
+    protected readonly debug: createDebug.IDebugger
+  ) {}
+
+  protected getSetKey(key: string): string {
+    return this.parent.key(LIVE_DATA_KEY_PREFIX, key);
+  }
+
+  protected getItemKey(key: string, name: string): string {
+    return this.parent.key(LIVE_DATA_KEY_PREFIX, `${key}:${name}`);
+  }
+
+  /**
+   * 设置，保持数据活跃
+   * @param key
+   * @param name
+   * @param data
+   * @param seconds
+   */
+  public set(
+    key: string,
+    name: string,
+    data: any,
+    seconds: number
+  ): Promise<any> {
+    const parent = this.parent;
+    return parent.redis
+      .multi()
+      .setex(this.getItemKey(key, name), seconds, JSON.stringify(data))
+      .sadd(this.getSetKey(key), name)
+      .exec(() => data) as any;
+  }
+
+  /**
+   * 删除
+   * @param key
+   * @param name
+   */
+  public delete(key: string, name: string): Promise<string> {
+    const parent = this.parent;
+    return parent.redis
+      .multi()
+      .del(this.getItemKey(key, name))
+      .srem(this.getSetKey(key), name)
+      .exec(() => key) as any;
+  }
+
+  /**
+   * 获取当前活跃的name列表
+   * @param key
+   */
+  public async getAliveNames(key: string): Promise<string[]> {
+    const parent = this.parent;
+    const names: string[] = await parent.redis.smembers(this.getSetKey(key));
+    // 如果数据已经不存在则需要将其从列表中删除
+    const multi = this.parent.redis.multi();
+    names.forEach(n => multi.exists(this.getItemKey(key, n)));
+    const exists = await multi.exec();
+    const rems: string[] = [];
+    const ret: string[] = [];
+    exists.forEach((item: any, i: number) => {
+      if (item[1]) {
+        ret.push(names[i]);
+      } else {
+        rems.push(names[i]);
+      }
+    });
+    if (rems.length > 0) {
+      this.debug("getAliveNames: auto clean expired items: %s", rems);
+      await parent.redis
+        .multi()
+        .del(...rems.map(n => this.getItemKey(key, n)))
+        .srem(this.getSetKey(key), ...rems)
+        .exec();
+    }
+    return ret;
+  }
+
+  /**
+   * 获取当前活跃的数据列表
+   * @param key
+   */
+  public getAlive(key: string): Promise<any[]> {
+    return this.getAliveNames(key).then(names =>
+      this.getItems(key, ...names).then(values =>
+        values.map((v, i) => ({ name: names[i], value: v }))
+      )
+    );
+  }
+
+  /**
+   * 获取指定name的数据
+   * @param key
+   * @param name
+   */
+  public getItem(key: string, name: string): Promise<any> {
+    const parent = this.parent;
+    return parent.redis
+      .get(this.getItemKey(key, name))
+      .then(str => JSON.parse(str)) as any;
+  }
+
+  /**
+   * 获取指定name列表的数据
+   * @param key
+   * @param names
+   */
+  public getItems(key: string, ...names: string[]): Promise<any[]> {
+    const parent = this.parent;
+    if (names.length < 1) return Promise.resolve([]);
+    return parent.redis
+      .mget(...names.map(n => this.getItemKey(key, n)))
+      .then((strs: string[]) => strs.map(s => JSON.parse(s))) as any;
   }
 }
 

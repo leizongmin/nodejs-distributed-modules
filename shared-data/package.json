@@ -1,6 +1,6 @@
 {
   "name": "@leizm/distributed-shared-data",
-  "version": "1.0.6",
+  "version": "1.1.0",
   "description": "分布式共享数据表",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
@@ -36,7 +36,7 @@
   },
   "scripts": {
     "compile": "rm -rf dist && tsc",
-    "test": "export DEBUG='@leizm:*' && mocha --exit --require ts-node/register src/test.ts",
+    "test": "export DEBUG='@leizm:*' && mocha --exit --timeout 30000 --require ts-node/register src/test.ts",
     "prepublish": "npm run compile && npm test"
   },
   "author": "Zongmin Lei <leizongmin@gmail.com>",
